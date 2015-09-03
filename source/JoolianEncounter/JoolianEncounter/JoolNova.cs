@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
+using ContractConfigurator.Util;
 
 namespace JoolianEncounter
 {
@@ -274,7 +275,7 @@ namespace JoolianEncounter
             {
                 field.SetValue(explosionRenderer, field.GetValue(jool.scaledBody.GetComponent<MeshRenderer>()));
             }
-            Texture2D explosionTex = GameDatabase.Instance.GetTexture("ContractPacks/JoolianEncounter/Images/explosion", false);
+            Texture2D explosionTex = TextureUtil.LoadTexture("ContractPacks/JoolianEncounter/Images/explosion.dds.noload");
             explosionRenderer.material.shader = Shader.Find("KSP/Alpha/Translucent");
             explosionRenderer.material.SetTexture(Shader.PropertyToID("_MainTex"), explosionTex);
             MeshFilter explosionMesh = explosion.AddComponent<MeshFilter>();
@@ -341,6 +342,7 @@ namespace JoolianEncounter
             burninating = false;
             explosion.transform.parent = null;
             Destroy(explosion);
+            Destroy(explosionTex);
         }
 
         public IEnumerator<YieldInstruction> Burninator()
