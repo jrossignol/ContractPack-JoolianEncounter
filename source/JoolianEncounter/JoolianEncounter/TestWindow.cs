@@ -13,7 +13,7 @@ namespace JoolianEncounter
         public static TestWindow Instance;
 
         private bool showGUI = false;
-        private Rect windowPos = new Rect(320, 160f, 160f, 80f);
+        private Rect windowPos = new Rect(480, 120f, 160f, 80f);
 
         void Start()
         {
@@ -46,10 +46,28 @@ namespace JoolianEncounter
 
         private void WindowGUI(int windowID)
         {
+            GUILayout.BeginVertical();
             if (GUILayout.Button("Boom goes the dynamite"))
             {
                 JoolNova.DoNova();
             }
+            if (GUILayout.Button("Jool"))
+            {
+                JoolNova.SetTransformed(false);
+            }
+            if (GUILayout.Button("Sun"))
+            {
+                JoolNova.SetTransformed(true);
+            }
+            if (GUILayout.Button("Dump Component Debug"))
+            {
+                foreach (Component compo in PSystemManager.Instance.localBodies.Find(b => b.name == "Jool").
+                    scaledBody.gameObject.GetComponentsInChildren<Component>(true))
+                {
+                    Debug.Log("    jool scaledBody compo: " + compo);
+                }
+            }
+            GUILayout.EndVertical();
             GUI.DragWindow();
         }
     }
