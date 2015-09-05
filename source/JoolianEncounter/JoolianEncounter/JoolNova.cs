@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
+using CameraFXModules;
 using ContractConfigurator.Util;
 
 namespace JoolianEncounter
@@ -329,6 +330,11 @@ namespace JoolianEncounter
                 if (!explosionsDone && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius)
                 {
                     ExplodeParts();
+                    FlightCameraFX fcfx = UnityEngine.Object.FindObjectOfType<FlightCameraFX>();
+                    MethodInfo eventMethod = typeof(FlightCameraFX).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).
+                        Where(mi => mi.Name == "OnVesselEvent").First();
+                    eventMethod.Invoke(fcfx, new object[] { new EventReport(FlightEvents.OVERHEAT, FlightGlobals.ActiveVessel.rootPart,
+                        FlightGlobals.ActiveVessel.name, "Jool") });
                 }
 
                 if (currentScale >= 10.0f)
