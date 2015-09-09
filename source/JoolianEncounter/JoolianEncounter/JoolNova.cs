@@ -38,6 +38,8 @@ namespace JoolianEncounter
         private static Material sunMaterial;
         private static Sun secondSun = null;
 
+        private static FieldInfo sunLightField = typeof(Sun).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Where(f => f.FieldType == typeof(Light)).Single();
+
         private State state = State.IDLE;
         private float currentScale;
         private Vector3 origScale;
@@ -49,8 +51,6 @@ namespace JoolianEncounter
         private bool explosionsDone = false;
 
         private static bool transformed = false;
-
-        private float startupTime = 0;
 
         void Start()
         {
@@ -177,10 +177,9 @@ namespace JoolianEncounter
                 currentScale += GROW_RATE * Time.deltaTime;
             }
 
-            // Not sure why, but if this gets done too early the light isn't initialized properly
-            startupTime += Time.deltaTime;
-            if (startupTime > 0.1f && transformed && secondSun == null)
+            if (transformed && secondSun == null)
             {
+                Debug.Log("JoolNova: Setting up second sun");
                 Sun old = Sun.Instance;
                 secondSun = Instantiate(Sun.Instance) as Sun;
                 Sun.Instance = old;
@@ -191,15 +190,22 @@ namespace JoolianEncounter
                         field.SetValue(secondSun, field.GetValue(old));
                     }
                 }
+
                 secondSun.light.color = newSunColor;
                 secondSun.gameObject.SetActive(true);
                 secondSun.sun = jool;
-                secondSun.fadeEnd = 0.01f;
                 secondSun.sunFlare.color = newSunColor;
                 secondSun.sunFlare.brightness *= 0.25f;
                 secondSun.enabled = true;
                 secondSun.useLocalSpaceSunLight = true;
                 secondSun.SunlightEnabled(transformed);
+            }
+
+            if (secondSun != null)
+            {
+                // Set the light intensity for our red dwarf - this seems to want to get reset
+                Light sunlight = sunLightField.GetValue(secondSun) as Light;
+                sunlight.intensity = 0.5f;
             }
         }
 
@@ -277,7 +283,7 @@ namespace JoolianEncounter
                 field.SetValue(explosionRenderer, field.GetValue(jool.scaledBody.GetComponent<MeshRenderer>()));
             }
             Texture2D explosionTex = TextureUtil.LoadTexture("ContractPacks/JoolianEncounter/Images/explosion.dds.noload");
-            explosionRenderer.material.shader = Shader.Find("KSP/Alpha/Translucent");
+            explosionRenderer.material.shader = Shader.Find("KSP/Alpha/Unlit Transparent");
             explosionRenderer.material.SetTexture(Shader.PropertyToID("_MainTex"), explosionTex);
             MeshFilter explosionMesh = explosion.AddComponent<MeshFilter>();
             explosionMesh.sharedMesh = jool.scaledBody.GetComponent<MeshFilter>().sharedMesh;
@@ -314,13 +320,13 @@ namespace JoolianEncounter
                 // Rescale the explosion
                 explosion.transform.localScale = Vector3.one * currentScale;
 
-                // Stop burninating 1000 km after it has passed
-                if (currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius + 1000000)
+                // Stop burninating 5000 km after it has passed
+                if (currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius + 5000000)
                 {
                     burninating = false;
                 }
-                // There's a big delay before the atmospheric effects kick in, so start burninating pretty early (2500km)
-                else if (!burninating && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius - 2500000)
+                // There's a big delay before the atmospheric effects kick in, so start burninating pretty early (5000 km)
+                else if (!burninating && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius - 5000000)
                 {
                     burninating = true;
                     StartCoroutine(Burninator());
@@ -330,12 +336,18 @@ namespace JoolianEncounter
                 if (!explosionsDone && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius)
                 {
                     ExplodeParts();
+
+                    // Do a camera wobble
                     FlightCameraFX fcfx = UnityEngine.Object.FindObjectOfType<FlightCameraFX>();
                     MethodInfo eventMethod = typeof(FlightCameraFX).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).
                         Where(mi => mi.Name == "OnVesselEvent").First();
                     eventMethod.Invoke(fcfx, new object[] { new EventReport(FlightEvents.OVERHEAT, FlightGlobals.ActiveVessel.rootPart,
                         FlightGlobals.ActiveVessel.name, "Jool") });
                 }
+
+                // Fade the alpha out as the explosion grows
+                float alpha = Mathf.Lerp(1.0f, 0.0f, currentScale / 10.0f);
+                explosionRenderer.material.color = new Color(1.0f, 1.0f, 1.0f, alpha);
 
                 if (currentScale >= 10.0f)
                 {
