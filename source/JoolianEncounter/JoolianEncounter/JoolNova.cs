@@ -283,7 +283,7 @@ namespace JoolianEncounter
                 field.SetValue(explosionRenderer, field.GetValue(jool.scaledBody.GetComponent<MeshRenderer>()));
             }
             Texture2D explosionTex = TextureUtil.LoadTexture("ContractPacks/JoolianEncounter/Images/explosion.dds.noload");
-            explosionRenderer.material.shader = Shader.Find("KSP/Alpha/Unlit Transparent");
+            explosionRenderer.material.shader = Shader.Find("KSP/Alpha/Translucent");
             explosionRenderer.material.SetTexture(Shader.PropertyToID("_MainTex"), explosionTex);
             MeshFilter explosionMesh = explosion.AddComponent<MeshFilter>();
             explosionMesh.sharedMesh = jool.scaledBody.GetComponent<MeshFilter>().sharedMesh;

@@ -47,6 +47,7 @@ namespace JoolianEncounter
         private void WindowGUI(int windowID)
         {
             GUILayout.BeginVertical();
+            GUILayout.Label("Jool");
             if (GUILayout.Button("Boom goes the dynamite"))
             {
                 JoolNova.DoNova();
@@ -66,6 +67,11 @@ namespace JoolianEncounter
                 {
                     Debug.Log("    jool scaledBody compo: " + compo);
                 }
+            }
+            GUILayout.Label("Kerbal");
+            if (GUILayout.Button("Ghost") && FlightGlobals.ActiveVessel != null && FlightGlobals.ActiveVessel.vesselType == VesselType.EVA)
+            {
+                GhostKerbal.MakeGhost(FlightGlobals.ActiveVessel);
             }
             GUILayout.EndVertical();
             GUI.DragWindow();
