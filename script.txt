@@ -1,0 +1,24 @@
+
+
+				THE JOOLIAN ENCOUNTER
+
+A note on character names: The Joolian Encounter is the continuation of the story started in Anomaly Surveyor.  In this document, there are two characters referred to as $STARJEB and $SURVIVOR.  These characters are the two characters that the player chooses to send on the final Jool mission.  One enters the monolith ($STARJEB) and one returns home ($SURVIVOR).  There are no restrictions on the names, genders or professions of these characters.
+
+
+CONTRACT: Give a new recruit a tour of KSC.
+DESCRIPTION: A promising new recruit, Victoria Kerman, is waiting outside the Administration building to be picked up and given a tour of the KSC.  Grab one of the rovers from the SPH and give her a tour in style before dropping her off at the Astronaut Complex.
+
+
+TEXT BOX (upon accepting contract): The story so far...
+
+<Show a picture of the monolith near Jool>
+
+It has been many years since $STARJEB and $SURVIVOR's fated encounter with the Jool Monolith.  The public are led to believe that $STARJEB died exploring Jool.  Few who know the truth of what happened at Jool believe it.
+
+<Show a picture of The Star Jeb near Jool>
+
+$SURVIVOR returned home a hero, but their story of $STARJEB becoming an immortal being known as "The Star Jeb" seem like the ravings of a Kerbal trapped alone in space for too long.  The Administration has quietly grounded him, but don't dare openly fire him from the space program.
+
+<Show a picture of one of the Mun Monoliths>
+
+The monoliths have gone silent, their strange signals no longer transmitted towards Jool.  But, how long will it be before they activate again?  The encounter at Jool has started something that cannot be stopped...
