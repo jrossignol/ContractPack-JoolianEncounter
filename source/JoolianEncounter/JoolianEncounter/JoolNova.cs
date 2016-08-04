@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using UnityEngine;
 using CameraFXModules;
+using ContractConfigurator;
 using ContractConfigurator.Util;
 
 namespace JoolianEncounter
@@ -38,14 +39,16 @@ namespace JoolianEncounter
         private static Material sunMaterial;
         private static Sun secondSun = null;
 
-        private static FieldInfo sunLightField = typeof(Sun).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Where(f => f.FieldType == typeof(Light)).Single();
+        private static FieldInfo sunLightField = typeof(Sun).GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Where(f => f.FieldType == typeof(Light)).ElementAt(1);
 
         private State state = State.IDLE;
-        private float currentScale;
+        private float joolScale;
+        private float explosionScale;
         private Vector3 origScale;
         private Vector3 origAtmoScale;
         private float origInnerRadius;
         private float origOuterRadius;
+        private float stateTime;
 
         private bool burninating = false;
         private bool explosionsDone = false;
@@ -166,15 +169,29 @@ namespace JoolianEncounter
         {
             if (state == State.JOOL_SHRINK)
             {
-                currentScale -= SHRINK_RATE * Time.deltaTime;
+                joolScale -= SHRINK_RATE * Time.deltaTime;
             }
-            else if (state == State.SUN_GROW)
+            else if (state == State.SUN_GROW || state == State.EXPLOSION_GROW)
             {
-                currentScale += GROW_RATE * Time.deltaTime;
-            }
-            else if (state == State.EXPLOSION_GROW)
-            {
-                currentScale += GROW_RATE * Time.deltaTime;
+                float x = (Time.time - stateTime);
+                if (state == State.SUN_GROW)
+                {
+                    float xGR = x * GROW_RATE;
+                    if (x < 2 * (FINAL_SCALE - SHRUNK_SCALE) / GROW_RATE)
+                    {
+                        // This is calculated as a quadratic to give a smoothed growth
+                        // b = GROWTH_RATE (to match the initial kick of the explosion
+                        // c = SHRUNK_SCALE (to match the starting size)
+                        // a = calculated such that at (y = FINAL_SCALE) we have a local maximum
+
+                        joolScale = -(xGR * xGR) / (4 * FINAL_SCALE - SHRUNK_SCALE) + xGR + SHRUNK_SCALE;
+                    }
+                    else
+                    {
+                        joolScale = FINAL_SCALE;
+                    }
+                }
+                explosionScale = (SHRUNK_SCALE + x * GROW_RATE) * 1.01f;
             }
 
             if (transformed && secondSun == null)
@@ -191,7 +208,7 @@ namespace JoolianEncounter
                     }
                 }
 
-                secondSun.light.color = newSunColor;
+                secondSun.GetComponent<Light>().color = newSunColor;
                 secondSun.gameObject.SetActive(true);
                 secondSun.sun = jool;
                 secondSun.sunFlare.color = newSunColor;
@@ -211,9 +228,9 @@ namespace JoolianEncounter
 
         private IEnumerator<YieldInstruction> NovaCoroutine()
         {
-            Debug.Log("JoolNova - Jool is going nova");
+            LoggingUtil.LogDebug(this, "Jool is going nova");
             state = State.JOOL_SHRINK;
-            currentScale = 1.0f;
+            joolScale = 1.0f;
 
             SetTransformed(false);
 
@@ -231,19 +248,19 @@ namespace JoolianEncounter
             while (true)
             {
                 // Check if this will be the last scaling operation
-                bool lastIteration = currentScale <= SHRUNK_SCALE;
+                bool lastIteration = joolScale <= SHRUNK_SCALE;
                 if (lastIteration)
                 {
-                    currentScale = SHRUNK_SCALE;
+                    joolScale = SHRUNK_SCALE;
                 }
 
                 // Rescale Jool's ScaledVersion Transform
-                jool.scaledBody.transform.localScale = origScale * currentScale;
+                jool.scaledBody.transform.localScale = origScale * joolScale;
 
                 // Rescale atmosphere
-                afg.innerRadius = origInnerRadius * currentScale;
-                afg.outerRadius = origOuterRadius * currentScale;
-                afg.transform.localScale = origAtmoScale * currentScale;
+                afg.innerRadius = origInnerRadius * joolScale;
+                afg.outerRadius = origOuterRadius * joolScale;
+                afg.transform.localScale = origAtmoScale * joolScale;
 
                 afg.KrESun = afg.Kr * afg.ESun;
                 afg.KmESun = afg.Km * afg.ESun;
@@ -256,8 +273,7 @@ namespace JoolianEncounter
                 afg.scaleDepth = -0.25f;
                 afg.scaleOverScaleDepth = afg.scale / afg.scaleDepth;
 
-                MethodInfo setMaterial = typeof(AtmosphereFromGround).GetMethod("SetMaterial", BindingFlags.NonPublic | BindingFlags.Instance);
-                setMaterial.Invoke(afg, new object[] { true });
+                afg.SetMaterial(true);
 
                 yield return null;
 
@@ -290,19 +306,27 @@ namespace JoolianEncounter
             explosion.SetActive(true);
 
             // Rescale over every iteration
-            currentScale = SHRUNK_SCALE;
+            joolScale = SHRUNK_SCALE;
             state = State.SUN_GROW;
+            stateTime = Time.time;
             while (true)
             {
                 // Check if this will be the last scaling operation
-                bool lastIteration = currentScale >= FINAL_SCALE;
+                bool lastIteration = joolScale >= FINAL_SCALE;
                 if (lastIteration)
                 {
-                    currentScale = FINAL_SCALE;
+                    joolScale = FINAL_SCALE;
                 }
 
-                // Rescale Jool's ScaledVersion Transform
-                jool.scaledBody.transform.localScale = origScale * currentScale;
+                // Rescale Jool's scaled body Transform
+                jool.scaledBody.transform.localScale = origScale * joolScale;
+
+                // Fade the alpha out as the explosion grows
+                float alpha = Mathf.Lerp(1.0f, 0.0f, (explosionScale / joolScale) / 10.0f);
+                explosionRenderer.material.color = new Color(1.0f, 1.0f, 1.0f, alpha);
+
+                // Rescale the explosion
+                explosion.transform.localScale = Vector3.one * (explosionScale / joolScale);
 
                 if (lastIteration)
                 {
@@ -312,32 +336,32 @@ namespace JoolianEncounter
             }
 
             // Continue with the outer part of the explosion
-            currentScale = 1.01f;
             state = State.EXPLOSION_GROW;
             explosionsDone = false;
             while (true)
             {
                 // Rescale the explosion
-                explosion.transform.localScale = Vector3.one * currentScale;
+                explosion.transform.localScale = Vector3.one * (explosionScale / joolScale);
 
                 // Stop burninating 5000 km after it has passed
-                if (currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius + 5000000)
+                if ((explosionScale / joolScale) * 1.01f * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius + 5000000)
                 {
                     burninating = false;
                 }
                 // There's a big delay before the atmospheric effects kick in, so start burninating pretty early (5000 km)
-                else if (!burninating && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius - 5000000)
+                else if (!burninating && (explosionScale / joolScale) * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius - 5000000)
                 {
                     burninating = true;
                     StartCoroutine(Burninator());
                 }
 
                 // Blow up the ship! (part of it)
-                if (!explosionsDone && currentScale * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius)
+                if (!explosionsDone && (explosionScale / joolScale) * jool.Radius >= FlightGlobals.ActiveVessel.altitude + jool.Radius)
                 {
                     ExplodeParts();
 
                     // Do a camera wobble
+                    LoggingUtil.LogDebug(this, "overheat event");
                     FlightCameraFX fcfx = UnityEngine.Object.FindObjectOfType<FlightCameraFX>();
                     MethodInfo eventMethod = typeof(FlightCameraFX).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic).
                         Where(mi => mi.Name == "OnVesselEvent").First();
@@ -346,10 +370,10 @@ namespace JoolianEncounter
                 }
 
                 // Fade the alpha out as the explosion grows
-                float alpha = Mathf.Lerp(1.0f, 0.0f, currentScale / 10.0f);
+                float alpha = Mathf.Lerp(1.0f, 0.0f, (explosionScale / joolScale) / 10.0f);
                 explosionRenderer.material.color = new Color(1.0f, 1.0f, 1.0f, alpha);
 
-                if (currentScale >= 10.0f)
+                if ((explosionScale / joolScale) >= 10.0f)
                 {
                     break;
                 }
@@ -365,6 +389,7 @@ namespace JoolianEncounter
 
         public IEnumerator<YieldInstruction> Burninator()
         {
+            LoggingUtil.LogDebug(this, "burninating");
             while (burninating && FlightGlobals.ActiveVessel != null && FlightGlobals.ActiveVessel.state  != Vessel.State.DEAD)
             {
                 Vessel v = FlightGlobals.ActiveVessel;
@@ -376,6 +401,7 @@ namespace JoolianEncounter
 
                 yield return new WaitForFixedUpdate();
             }
+            LoggingUtil.LogDebug(this, "burninating done");
         }
 
         // TODO - this only works for loaded vessels right now
@@ -410,13 +436,15 @@ namespace JoolianEncounter
                 }
                 double d2 = Vector3.Cross(pdiff, vdiff).sqrMagnitude / pdiff.sqrMagnitude;
                 return d2 > v.mainBody.Radius * v.mainBody.Radius;
-            }))
+            }).ToList())
             {
+                double maxTemp = double.MaxValue;
+
                 // Find suitable parts
                 List<Part> parts = new List<Part>();
                 foreach (Part part in v.parts.Where(p => 
                 {
-                    if (p.maxTemp < 2000f)
+                    if (p.skinMaxTemp < 2000f)
                     {
                         return true;
                     }
@@ -432,6 +460,9 @@ namespace JoolianEncounter
                             }
                         }
                     }
+
+                    // Make it hot!
+                    maxTemp = Math.Min(maxTemp, p.maxTemp);
                     return false;
                 }))
                 {
@@ -442,6 +473,13 @@ namespace JoolianEncounter
                 foreach (Part p in parts)
                 {
                     p.explode();
+                }
+
+                // Make whatever's left hotter
+                foreach (Part p in v.parts)
+                {
+                    p.temperature = maxTemp - 1.0;
+                    p.skinTemperature = maxTemp - 1.0;
                 }
             }
             explosionsDone = true;
